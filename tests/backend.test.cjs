@@ -30,3 +30,29 @@ test('returning participant skips setup; sent report requires explicit edit; new
  assert.equal(vm.runInContext('state.success',c),true);assert.equal(vm.runInContext('state.revisited',c),true);assert.equal(vm.runInContext('state.today',c),'Сделано');
  await vm.runInContext("state.id='u2';loadPerson().then(enterPerson)",c);assert.equal(vm.runInContext('state.step',c),1);assert.equal(vm.runInContext('state.success',c),false);assert.equal(vm.runInContext('state.today',c),'');
 });
+test('history is participant-scoped, newest first and paginated without overlap',()=>{
+ const e=env();e.goal();for(let i=1;i<=12;i++){e.setTime(`2026-09-${String(i).padStart(2,'0')}T10:00:00Z`);e.context.submitReport(e.payload({today:'День '+i}))}
+ const a=e.context.getHistory({participantId:'u1'});assert.equal(a.reports.length,10);assert.equal(a.reports[0].date,'2026-09-12');assert.equal(a.nextBefore,'2026-09-03');assert.equal(a.reports[0].revision,undefined);
+ const b=e.context.getHistory({participantId:'u1',before:a.nextBefore});assert.equal(b.reports.length,2);assert.equal(b.reports[0].date,'2026-09-02');assert.equal(b.nextBefore,null);assert.equal(e.context.getHistory({participantId:'u2'}).reports.length,0);assert.throws(()=>e.context.getHistory({participantId:'bad'}));assert.throws(()=>e.context.getHistory({participantId:'u1',before:42}));
+});
+function frontend(){
+ const source=fs.readFileSync(require('node:path').join(__dirname,'../Index.html'),'utf8').split('<script>')[1].split('</script>')[0].replace(/init\(\);\s*$/,'');
+ const data=new Map(),element={hidden:false,textContent:'',innerHTML:'',scrollIntoView(){}};
+ const c=vm.createContext({Intl,Date,console,crypto,setTimeout,clearTimeout,navigator:{onLine:true},localStorage:{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)},document:{getElementById:()=>element,addEventListener(){}}});
+ vm.runInContext(source+'\nrender=()=>{};',c);return c;
+}
+test('draft resumes exact step and stays isolated by participant and day',async()=>{
+ const c=frontend();await vm.runInContext("state.id='u1';write('database',{goals:{u1:'Цель'},reports:{}});loadPerson();",c);
+ vm.runInContext("state.step=3;state.today='Сделал';state.tomorrow='План';saveDraft();",c);
+ await vm.runInContext('loadPerson().then(enterPerson)',c);assert.equal(vm.runInContext('state.view',c),'resume');vm.runInContext('resumeDraft()',c);assert.equal(vm.runInContext('state.step',c),3);assert.equal(vm.runInContext('state.today',c),'Сделал');
+ await vm.runInContext("state.id='u2';loadPerson().then(enterPerson)",c);assert.equal(vm.runInContext('state.hasDraft',c),false);assert.equal(vm.runInContext('state.today',c),'');
+});
+test('offline retry keeps request ID, retains answers, succeeds once and clears draft',async()=>{
+ const c=frontend();vm.runInContext("state.id='u1';state.step=4;state.goal=state.goalSaved='Цель';state.today='Сегодня';state.tomorrow='Завтра';state.insight='Мысль';write('database',{goals:{u1:'Цель'},reports:{}});navigator.onLine=false",c);
+ await vm.runInContext('submit()',c);assert.equal(vm.runInContext('state.success',c),false);assert.equal(vm.runInContext('state.retrySend',c),true);assert.equal(vm.runInContext('state.draftSaved',c),true);const request=vm.runInContext('pending.requestId',c);
+ await vm.runInContext('loadPerson().then(enterPerson)',c);assert.equal(vm.runInContext('pending.requestId',c),request);vm.runInContext('resumeDraft();navigator.onLine=true',c);await vm.runInContext('submit()',c);assert.equal(vm.runInContext('state.success',c),true);assert.equal(vm.runInContext("Object.keys(read('database').reports).length",c),1);assert.equal(vm.runInContext('read(draftKey())',c),null);
+});
+test('lost acknowledgement is recognized on reload, stale local drafts do not overwrite updated reports',async()=>{
+ const c=frontend();vm.runInContext("state.id='u1';state.step=4;state.goal=state.goalSaved='Цель';state.today='Сегодня';state.tomorrow='Завтра';state.insight='Мысль';write('database',{goals:{u1:'Цель'},reports:{}});navigator.onLine=false",c);await vm.runInContext('submit()',c);vm.runInContext('demoSubmit(pending)',c);await vm.runInContext('loadPerson().then(enterPerson)',c);assert.equal(vm.runInContext('state.success',c),true);assert.equal(vm.runInContext('state.hasDraft',c),false);assert.equal(vm.runInContext('read(draftKey())',c),null);
+ vm.runInContext("state.success=false;state.today='Устаревший черновик';saveDraft();const db=read('database');db.reports[state.id+':'+state.date].revision='new-revision';db.reports[state.id+':'+state.date].today='Свежий отчёт';write('database',db)",c);await vm.runInContext('loadPerson().then(enterPerson)',c);assert.equal(vm.runInContext('state.today',c),'Свежий отчёт');assert.equal(vm.runInContext('state.hasDraft',c),false);
+});
