@@ -51,7 +51,8 @@ function getParticipant(input) {
   return locked_(() => {
     const p = participant_(input && input.participantId), book = book_(), entry = entry_(book,p.id);
     const sheet=book.getSheetById(entry.sheetId), date=day_(), match=findReport_(sheet,date);
-    return {goal:entry.goal,report:match ? report_(match.values) : null,date:date};
+    const yesterday=dayBefore_(date), previous=findReport_(sheet,yesterday);
+    return {goal:entry.goal,report:match ? report_(match.values) : null,yesterdayPlan:previous ? String(previous.values[3]) : '',date:date};
   });
 }
 function saveGoal(input) {
@@ -89,6 +90,7 @@ function participant_(id){const p=PARTICIPANTS.find(p=>p.id===id);if(!p)throw ne
 function book_(){const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw new Error('Таблица ещё не подключена. Владелец должен выполнить setup_.');return SpreadsheetApp.openById(id);}
 function entry_(book,id){const registry=book.getSheetByName('_Участники');if(!registry)throw new Error('Владелец должен выполнить setup_.');const data=registry.getDataRange().getValues();const i=data.findIndex((r,n)=>n>0&&r[0]===id);if(i<0)throw new Error('Участник ещё не настроен.');return {row:i+1,goal:String(data[i][2]||''),sheetId:Number(data[i][3])};}
 function day_(){return Utilities.formatDate(new Date(),TIME_ZONE,'yyyy-MM-dd');}
+function dayBefore_(date){return Utilities.formatDate(new Date(new Date(date+'T12:00:00+06:00').getTime()-86400000),TIME_ZONE,'yyyy-MM-dd');}
 function findReport_(sheet,date){if(!sheet)throw new Error('Лист участника не найден.');if(sheet.getLastRow()<2)return null;const values=sheet.getRange(2,1,sheet.getLastRow()-1,8).getValues();const i=values.findIndex(r=>(r[0] instanceof Date?Utilities.formatDate(r[0],TIME_ZONE,'yyyy-MM-dd'):String(r[0]))===date);return i<0?null:{row:i+2,values:values[i]};}
 function report_(r){return {date:r[0] instanceof Date?Utilities.formatDate(r[0],TIME_ZONE,'yyyy-MM-dd'):String(r[0]),goal:String(r[1]),today:String(r[2]),tomorrow:String(r[3]),insight:String(r[4]),submittedAt:r[5] instanceof Date?r[5].toISOString():String(r[5]),revision:r[6],requestId:r[7]};}
 function locked_(fn){const lock=LockService.getScriptLock();lock.waitLock(25000);try{return fn();}finally{lock.releaseLock();}}
