@@ -28,7 +28,9 @@ const PARTICIPANTS = [
   { id: 'u7', name: 'Усов Денис' }
 ];
 const LIVE = typeof google !== 'undefined' && !!google.script?.run;
-const PREFIX = LIVE ? 'daily-project-live-v1:' : 'daily-project-demo-v1:';
+const PREFIX = LIVE ? 'daily-project-live-v2:' : 'daily-project-demo-v2:';
+// Discard drafts from the trial run after the owner's data reset.
+try{for(const key of Object.keys(localStorage)){if(key.startsWith('daily-project-live-v1:')||key.startsWith('daily-project-demo-v1:'))localStorage.removeItem(key)}}catch{}
 const names=['Участник','Цель на проект','Сегодня','Завтра','Инсайт'];
 const questions=[null,{key:'goal',title:'Какая у вас цель на проект?',description:'К чему хотите прийти? Цель сохранится — завтра её не придётся писать заново.',label:'Моя цель',placeholder:'Опишите результат, к которому стремитесь…'},{key:'today',title:'Что сделали сегодня?',description:'Запишите выполненные задачи. Даже небольшой шаг имеет значение.',label:'Сегодня я…',placeholder:'Что удалось сделать за сегодняшний день?'},{key:'tomorrow',title:'Что планируете на завтра?',description:'Назовите следующие шаги, которые помогут продвинуться к цели.',label:'Завтра я планирую…',placeholder:'С чего начнёте и что хотите успеть?'},{key:'insight',title:'Какой у вас инсайт дня?',description:'Что сегодня впечатлило, порадовало или стало открытием?',label:'Мой инсайт',placeholder:'Мысль, хороший момент или маленькое открытие…'}];
 let storageOK=true;
