@@ -3,6 +3,7 @@ const TIME_ZONE = 'Asia/Omsk';
 const PARTICIPANTS = [
   { id: 'u1', name: 'Димурина Анжелика' },
   { id: 'u2', name: 'Криворучко Елена' },
+  { id: 'u8', name: 'Лебедев Евгений' },
   { id: 'u3', name: 'Лукьянцева Ольга' },
   { id: 'u4', name: 'Росоловская Любовь' },
   { id: 'u5', name: 'Самойлов Виталий' },
