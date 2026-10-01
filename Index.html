@@ -17,7 +17,15 @@
 </div>
 <script>
 'use strict';
-const PARTICIPANTS = [{id:'p1',name:'Человек один'},{id:'p2',name:'Человек два'},{id:'p3',name:'Человек три'}];
+const PARTICIPANTS = [
+  { id: 'u1', name: 'Димурина Анжелика' },
+  { id: 'u2', name: 'Криворучко Елена' },
+  { id: 'u3', name: 'Лукьянцева Ольга' },
+  { id: 'u4', name: 'Росоловская Любовь' },
+  { id: 'u5', name: 'Самойлов Виталий' },
+  { id: 'u6', name: 'Сумарокова Юлия' },
+  { id: 'u7', name: 'Усов Денис' }
+];
 const LIVE = typeof google !== 'undefined' && !!google.script?.run;
 const PREFIX = LIVE ? 'daily-project-live-v1:' : 'daily-project-demo-v1:';
 const names=['Участник','Цель на проект','Сегодня','Завтра','Инсайт'];
