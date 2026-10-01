@@ -63,14 +63,35 @@ function getParticipant(input) {
 /** Read-only history, newest first, with a date cursor so new reports do not shift pages. */
 function getHistory(input) {
   const p=participant_(input && input.participantId), before=input.before||null;
+  const query=String(input.query||'').trim().toLocaleLowerCase('ru-RU');
+  if(query.length>200)throw new Error('Поиск: максимум 200 символов.');
+  const date=input.date||null;
+  if(date&&!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error('Некорректная дата.');
   if(before!==null&&(typeof before!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(before)))throw new Error('Некорректная дата истории.');
   return locked_(() => {
     const book=book_(),entry=entry_(book,p.id),sheet=book.getSheetById(entry.sheetId);
     if(sheet.getLastRow()<2)return {reports:[],nextBefore:null};
     const reports=sheet.getRange(2,1,sheet.getLastRow()-1,8).getValues().filter(r=>r[0]).map(report_)
-      .filter(r=>!before||r.date<before).sort((a,b)=>b.date.localeCompare(a.date));
+      .filter(r=>(!before||r.date<before)&&(!date||r.date===date)&&(!query||[r.goal,r.today,r.tomorrow,r.insight].some(v=>v.toLocaleLowerCase('ru-RU').includes(query)))).sort((a,b)=>b.date.localeCompare(a.date));
     const page=reports.slice(0,10).map(r=>({date:r.date,goal:r.goal,today:r.today,tomorrow:r.tomorrow,insight:r.insight,submittedAt:r.submittedAt}));
     return {reports:page,nextBefore:reports.length>10?page[page.length-1].date:null};
+  });
+}
+function getDashboard(input) {
+  const id=input&&input.participantId;
+  if(id)participant_(id);
+  const month=input&&input.month||day_().slice(0,7);
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw new Error('Некорректный месяц.');
+  return locked_(()=>{
+    const book=book_(),date=day_();let dates=[];
+    const participants=PARTICIPANTS.map(p=>{
+      const entry=entry_(book,p.id),sheet=book.getSheetById(entry.sheetId);
+      const reports=sheet.getLastRow()<2?[]:sheet.getRange(2,1,sheet.getLastRow()-1,8).getValues().filter(r=>r[0]).map(report_);
+      if(p.id===id)dates=reports.filter(r=>r.date.slice(0,7)===month).map(r=>r.date);
+      const report=reports.find(r=>r.date===date);
+      return {id:p.id,name:p.name,submitted:!!report,submittedAt:report?report.submittedAt:null};
+    });
+    return {date,month,dates,participants};
   });
 }
 function saveGoal(input) {
