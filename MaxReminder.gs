@@ -48,8 +48,8 @@ function maxReminderTick(event) {
     const chatId=props.getProperty('MAX_CHAT_ID');
     if(!chatId||!props.getProperty('MAX_BOT_TOKEN'))throw new Error('Не заполнены настройки MAX.');
     const book=book_();
-    const allDone=PARTICIPANTS.every(p=>{const entry=entry_(book,p.id);return !!findReport_(book.getSheetById(entry.sheetId),date);});
-    const text=allDone?'Все молодцы! Отчеты сданы.':'Пора подвести итоги дня! Если вы ещё не отправили отчёт за сегодня, заполните форму:\n'+MAX_FORM_URL;
+    const missing=PARTICIPANTS.filter(p=>{const entry=entry_(book,p.id);return !findReport_(book.getSheetById(entry.sheetId),date);});
+    const text=missing.length===0?'Все молодцы! Отчеты сданы.':'Пора подвести итоги дня!\nЕщё не сдали отчёт за сегодня: '+missing.map(p=>p.name.split(' ')[0]).join(', ')+'.\nЗаполните форму:\n'+MAX_FORM_URL;
     // Claim before HTTP to prevent a duplicate after a lost acknowledgement.
     // An uncertain delivery is recorded for owner review, not automatically resent.
     props.setProperty('MAX_LAST_ATTEMPT_DATE',date);
