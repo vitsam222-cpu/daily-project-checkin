@@ -1,10 +1,8 @@
 /** Daily project reports. All helpers ending in _ are private to Apps Script. */
 const TIME_ZONE = 'Asia/Omsk';
 const PARTICIPANTS = [
-  { id: 'u1', name: 'Димурина Анжелика' },
   { id: 'u2', name: 'Криворучко Елена' },
   { id: 'u8', name: 'Лебедев Евгений' },
-  { id: 'u4', name: 'Росоловская Любовь' },
   { id: 'u5', name: 'Самойлов Виталий' },
   { id: 'u6', name: 'Сумарокова Юлия' },
   { id: 'u7', name: 'Усов Денис' }
