@@ -40,25 +40,34 @@ function maxReminderTick(event) {
   if(!event||String(event.triggerUid)!==props.getProperty('MAX_TRIGGER_ID')||props.getProperty('MAX_REMINDERS_ENABLED')!=='true')return;
   const now=new Date(),date=Utilities.formatDate(now,TIME_ZONE,'yyyy-MM-dd'),time=Utilities.formatDate(now,TIME_ZONE,'HH:mm');
   // Minute-based clock avoids a daily trigger's random hour. Apps Script can still be delayed.
-  if(date<MAX_START_DATE||time<'21:00'||time>='21:15')return;
+  const weekday=new Date(date+'T12:00:00+06:00').getUTCDay();
+  const morning=time>='09:00'&&time<'09:15';
+  const evening=time>='21:00'&&time<'21:15';
+  if(date<MAX_START_DATE||(!morning&&!evening))return;
+  // Morning checks yesterday: Tuesday–Saturday. Evening checks today: Monday–Friday.
+  if(morning?(weekday===0||weekday===1):(weekday===0||weekday===6))return;
+  const reportDate=morning?Utilities.formatDate(new Date(now.getTime()-86400000),TIME_ZONE,'yyyy-MM-dd'):date;
+  if(reportDate<MAX_START_DATE)return;
+  const prefix=morning?'MAX_MORNING':'MAX';
   const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return;
   try{
-    const attempt=props.getProperty('MAX_LAST_ATTEMPT_DATE');
+    const attempt=props.getProperty(prefix+'_LAST_ATTEMPT_DATE');
     if(attempt===date)return;
     const chatId=props.getProperty('MAX_CHAT_ID');
     if(!chatId||!props.getProperty('MAX_BOT_TOKEN'))throw new Error('Не заполнены настройки MAX.');
     const book=book_();
-    const missing=PARTICIPANTS.filter(p=>{const entry=entry_(book,p.id);return !findReport_(book.getSheetById(entry.sheetId),date);});
-    const text=missing.length===0?'Все молодцы! Отчеты сданы.':'Пора подвести итоги дня!\nЕщё не сдали отчёт за сегодня: '+missing.map(p=>p.name.split(' ')[0]).join(', ')+'.\nЗаполните форму:\n'+MAX_FORM_URL;
+    const missing=PARTICIPANTS.filter(p=>{const entry=entry_(book,p.id);return !findReport_(book.getSheetById(entry.sheetId),reportDate);});
+    if(morning&&missing.length===0)return;
+    const text=morning?'За вчера ('+reportDate+') ещё не сдали отчёт: '+missing.map(p=>p.name.split(' ')[0]).join(', ')+'.\nФорма отчёта:\n'+MAX_FORM_URL:missing.length===0?'Все молодцы! Отчеты сданы.':'Пора подвести итоги дня!\nЕщё не сдали отчёт за сегодня: '+missing.map(p=>p.name.split(' ')[0]).join(', ')+'.\nЗаполните форму:\n'+MAX_FORM_URL;
     // Claim before HTTP to prevent a duplicate after a lost acknowledgement.
     // An uncertain delivery is recorded for owner review, not automatically resent.
-    props.setProperty('MAX_LAST_ATTEMPT_DATE',date);
-    props.setProperty('MAX_LAST_STATUS','sending');
+    props.setProperty(prefix+'_LAST_ATTEMPT_DATE',date);
+    props.setProperty(prefix+'_LAST_STATUS','sending');
     try{
       const result=maxApi_('/messages?chat_id='+encodeURIComponent(chatId)+'&disable_link_preview=true',{text,notify:true});
       if(!result.message)throw new Error('MAX не подтвердил отправку.');
-      props.setProperty('MAX_LAST_SENT_DATE',date);props.setProperty('MAX_LAST_STATUS','sent');
-    }catch(e){props.setProperty('MAX_LAST_STATUS','delivery_uncertain');throw new Error('Напоминание MAX: отправка не подтверждена. Проверьте группу перед повтором.');}
+      props.setProperty(prefix+'_LAST_SENT_DATE',date);props.setProperty(prefix+'_LAST_STATUS','sent');
+    }catch(e){props.setProperty(prefix+'_LAST_STATUS','delivery_uncertain');throw new Error('Напоминание MAX: отправка не подтверждена. Проверьте группу перед повтором.');}
   }finally{lock.releaseLock();}
 }
 function maxApi_(path,payload) {
